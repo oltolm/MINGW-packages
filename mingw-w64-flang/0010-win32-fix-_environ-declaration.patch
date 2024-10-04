@@ -1,0 +1,27 @@
+From fc5d0ba3c192047590439dafbeb2ea66ec989776 Mon Sep 17 00:00:00 2001
+From: oltolm <oleg.tolmatcev@gmail.com>
+Date: Fri, 4 Oct 2024 03:09:51 +0200
+Subject: [PATCH 2/2] win32: fix _environ declaration
+
+---
+ runtime/environment.cpp | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/runtime/environment.cpp b/runtime/environment.cpp
+index 52b1d99..7fe4f51 100644
+--- a/runtime/environment.cpp
++++ b/runtime/environment.cpp
+@@ -15,9 +15,7 @@
+ #include <cstring>
+ #include <limits>
+ 
+-#ifdef _WIN32
+-extern char **_environ;
+-#else
++#ifndef _WIN32
+ extern char **environ;
+ #endif
+ 
+-- 
+2.46.0.windows.1
+

@@ -1,6 +1,19 @@
+From 4ce2573dcb2e9e74a1ed0d61a5b82e7b2fb86539 Mon Sep 17 00:00:00 2001
+From: oltolm <oleg.tolmatcev@gmail.com>
+Date: Mon, 30 Sep 2024 00:01:58 +0200
+Subject: [PATCH] do not define pid_t on mingw
+
+---
+ include/flang/Optimizer/Builder/Runtime/RTBuilder.h | 2 +-
+ include/flang/Runtime/command.h                     | 2 +-
+ runtime/command.cpp                                 | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/include/flang/Optimizer/Builder/Runtime/RTBuilder.h b/include/flang/Optimizer/Builder/Runtime/RTBuilder.h
+index 845ba38..a09a506 100644
 --- a/include/flang/Optimizer/Builder/Runtime/RTBuilder.h
 +++ b/include/flang/Optimizer/Builder/Runtime/RTBuilder.h
-@@ -28,7 +28,7 @@
+@@ -29,7 +29,7 @@
  #include <cstdint>
  #include <functional>
  
@@ -9,6 +22,8 @@
  // On Windows* OS GetCurrentProcessId returns DWORD aka uint32_t
  typedef std::uint32_t pid_t;
  #endif
+diff --git a/include/flang/Runtime/command.h b/include/flang/Runtime/command.h
+index 7ab3f64..3add66d 100644
 --- a/include/flang/Runtime/command.h
 +++ b/include/flang/Runtime/command.h
 @@ -12,7 +12,7 @@
@@ -20,6 +35,8 @@
  // On Windows* OS GetCurrentProcessId returns DWORD aka uint32_t
  typedef std::uint32_t pid_t;
  #else
+diff --git a/runtime/command.cpp b/runtime/command.cpp
+index a555e26..bed4d95 100644
 --- a/runtime/command.cpp
 +++ b/runtime/command.cpp
 @@ -15,7 +15,7 @@
@@ -28,6 +45,9 @@
  
 -#ifdef _WIN32
 +#ifdef _MSC_VER
- #define WIN32_LEAN_AND_MEAN
- #define NOMINMAX
- #include <windows.h>
+ #include "flang/Common/windows-include.h"
+ #include <direct.h>
+ #define getcwd _getcwd
+-- 
+2.46.0.windows.1
+

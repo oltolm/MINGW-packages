@@ -5,7 +5,7 @@ _compiler=clang
 _realname=flang
 pkgbase=mingw-w64-${_realname}
 pkgname=("${MINGW_PACKAGE_PREFIX}-${_realname}")
-_version=18.1.8
+_version=19.1.2
 _rc=""
 _tag=llvmorg-${_version}${_rc}
 pkgver=${_version}${_rc/-/}
@@ -43,17 +43,19 @@ source=("${_url}/${_pkgfn}.tar.xz"{,.sig}
         "0005-Fix-c_long_double-value-on-mingw-aarch64.patch"
         "0006-Rename-flang-new-flang-experimental-exec-to-flang.patch"
         "0007-add-municode-flag-on-mingw.patch"
-        "0008-do-not-use-clock_gettime-on-mingw.patch")
-sha256sums=('3532b790760f83d5086b913c0ee2479b42605720090dd47f91f58512ab17493c'
+        "0008-do-not-use-clock_gettime-on-mingw.patch"
+        "0010-win32-fix-_environ-declaration.patch")
+sha256sums=('f175f1f313438dbb34573b0776347a371c37da19dc835df613bbffba4e85d8d0'
             'SKIP'
-            '59badef592dd34893cd319d42b323aaa990b452d05c7180ff20f23ab1b41e837'
+            '139209d798fbe4a84becfa605aee7fd8f4412c6591976f3e672211e3fbdcf65b'
             'SKIP'
             '77fb0612217b6af7a122f586a9d0d334cd48bb201509bf72e8f8e6244616e895'
-            '522dabff1ae18218c4dfea484d472f9fac3cd3f597de2afde1e338ed57363405'
+            'b5d16336fc878d12a224b88133eae6943f2d9ac7b4454f0fbb275930b609e1f2'
             'a1811227e2a26c2786b0c8577528580e679111f6c0889afea57d08333e2d5e4f'
-            '8f98b693171de1aa573372041275dd73b282ab417e0553c7a8be1d1848b1f1ad'
+            '53ab2300549fbade3850a3a30f07016e0c2297927b1e5d48c2e0687af0a6ef11'
             '45f8da68b2cb48c85db7099e174e7eebeabe90207a23ff19c7fe1e7f1f8541d8'
-            'be1265d4922f45cc4e7ec6a80247baba8b1e648e1e514718ebd1004958bae967')
+            'be1265d4922f45cc4e7ec6a80247baba8b1e648e1e514718ebd1004958bae967'
+            '30dbec1cf84f6e50feaf529bf52f5d93aea587bf385c61b7e038b29fa87f0177')
 validpgpkeys=('B6C8F98282B944E3B0D5C2530FC3042E345AD05D'  # Hans Wennborg, Google.
               '474E22316ABF4785A88C6E8EA2C794A986419D8A'  # Tom Stellard
               'D574BD5D1D0E98895E3BF90044F2485E45D59042') # Tobias Hieta
@@ -76,7 +78,8 @@ prepare() {
     "0004-do-not-define-pid_t-on-mingw.patch" \
     "0005-Fix-c_long_double-value-on-mingw-aarch64.patch" \
     "0007-add-municode-flag-on-mingw.patch" \
-    "0008-do-not-use-clock_gettime-on-mingw.patch"
+    "0008-do-not-use-clock_gettime-on-mingw.patch" \
+    "0010-win32-fix-_environ-declaration.patch"
   # https://reviews.llvm.org/D143592
   apply_patch_with_msg \
     "0006-Rename-flang-new-flang-experimental-exec-to-flang.patch"
@@ -108,6 +111,8 @@ build() {
     -DLLVM_ENABLE_THREADS=ON \
     -DLLVM_LINK_LLVM_DYLIB=ON \
     -DCLANG_DIR=${MINGW_PREFIX}/lib/cmake/clang \
+    -DMLIR_DIR=${MINGW_PREFIX}/lib/cmake/mlir \
+    -DLLVM_DIR=${MINGW_PREFIX}/lib/cmake/llvm \
     -DFLANG_INCLUDE_TESTS=OFF \
     "${_extra_config[@]}" \
     -Wno-dev \
