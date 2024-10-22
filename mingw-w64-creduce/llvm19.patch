@@ -1,0 +1,217 @@
+diff --git a/clang_delta/CommonRenameClassRewriteVisitor.h b/clang_delta/CommonRenameClassRewriteVisitor.h
+index 023937a..13c8e3a 100644
+--- a/clang_delta/CommonRenameClassRewriteVisitor.h
++++ b/clang_delta/CommonRenameClassRewriteVisitor.h
+@@ -57,9 +57,6 @@ public:
+   bool VisitDependentTemplateSpecializationTypeLoc(
+          DependentTemplateSpecializationTypeLoc DTSLoc);
+ 
+-  bool VisitClassTemplatePartialSpecializationDecl(
+-         ClassTemplatePartialSpecializationDecl *D);
+-
+   bool VisitClassTemplateSpecializationDecl(
+          ClassTemplateSpecializationDecl *TSD);
+ 
+@@ -122,39 +119,6 @@ bool CommonRenameClassRewriteVisitor<T>::TraverseConstructorInitializer(
+   return true;
+ }
+ 
+-template<typename T> 
+-bool CommonRenameClassRewriteVisitor<T>::
+-     VisitClassTemplatePartialSpecializationDecl(
+-       ClassTemplatePartialSpecializationDecl *D)
+-{
+-  const Type *Ty = D->getInjectedSpecializationType().getTypePtr();
+-  TransAssert(Ty && "Bad TypePtr!");
+-  const TemplateSpecializationType *TST = 
+-    dyn_cast<TemplateSpecializationType>(Ty);
+-  TransAssert(TST && "Bad TemplateSpecializationType!");
+-
+-  TemplateName TplName = TST->getTemplateName();
+-  const TemplateDecl *TplD = TplName.getAsTemplateDecl();
+-  TransAssert(TplD && "Invalid TemplateDecl!");
+-  NamedDecl *ND = TplD->getTemplatedDecl();
+-  TransAssert(ND && "Invalid NamedDecl!");
+-
+-  const CXXRecordDecl *CXXRD = dyn_cast<CXXRecordDecl>(ND);
+-  TransAssert(CXXRD && "Invalid CXXRecordDecl!");
+-
+-  std::string Name;
+-  if (getNewName(CXXRD, Name)) {
+-    const TypeSourceInfo *TyInfo = D->getTypeAsWritten();
+-    if (!TyInfo)
+-      return true;
+-    TypeLoc TyLoc = TyInfo->getTypeLoc();
+-    SourceLocation LocStart = TyLoc.getBeginLoc();
+-    TransAssert(LocStart.isValid() && "Invalid Location!");
+-    TheRewriter->ReplaceText(LocStart, CXXRD->getNameAsString().size(), Name);
+-  }
+-  return true;
+-}
+-
+ // ISSUE: I am not sure why, but RecursiveASTVisitor doesn't recursively
+ // visit base classes from explicit template specialization, e.g.,
+ //   struct A { };
+@@ -394,6 +358,7 @@ bool CommonRenameClassRewriteVisitor<T>::TraverseTemplateArgumentLoc(
+   case TemplateArgument::Null:
+   case TemplateArgument::Declaration:
+   case TemplateArgument::Integral:
++  case TemplateArgument::StructuralValue:
+     return true;
+ 
+   case TemplateArgument::Type: {
+diff --git a/clang_delta/ExpressionDetector.cpp b/clang_delta/ExpressionDetector.cpp
+index cf70392..74b4b21 100644
+--- a/clang_delta/ExpressionDetector.cpp
++++ b/clang_delta/ExpressionDetector.cpp
+@@ -64,7 +64,7 @@ public:
+                           StringRef FileName, bool IsAngled,
+                           CharSourceRange FilenameRange, OptionalFileEntryRef File,
+                           StringRef SearchPath, StringRef RelativePath,
+-                          const Module *Imported,
++                          const Module *Imported, bool ModuleImported,
+                           SrcMgr::CharacteristicKind FileType) override;
+ 
+ private:
+@@ -80,12 +80,13 @@ private:
+ void IncludesPPCallbacks::InclusionDirective(SourceLocation HashLoc,
+                                              const Token &/*IncludeTok*/,
+                                              StringRef FileName,
+-                                            bool /*IsAngled*/,
++                                             bool /*IsAngled*/,
+                                              CharSourceRange /*FilenameRange*/,
+                                              OptionalFileEntryRef /*File*/,
+                                              StringRef /*SearchPath*/,
+                                              StringRef /*RelativePath*/,
+-                                             const Module * /*Imported*/,
++                                             const Module * /*SuggestedModule*/,
++                                             bool /*ModuleImported*/,
+                                              SrcMgr::CharacteristicKind /*FileType*/)
+ {
+   if (!SrcManager.isInMainFile(HashLoc))
+@@ -118,7 +119,7 @@ bool LocalTmpVarCollector::VisitDeclRefExpr(DeclRefExpr *DRE)
+   const VarDecl *VD = dyn_cast<VarDecl>(DRE->getDecl());
+   if (!VD)
+     return true;
+-  if (VD->getName().startswith(Prefix))
++  if (VD->getName().starts_with(Prefix))
+     TmpVars.push_back(VD);
+   return true;
+ }
+@@ -363,7 +364,7 @@ void ExpressionDetector::addOneTempVar(const VarDecl *VD)
+ {
+   if (!VD)
+     return;
+-  if (!VD->getName().startswith(TmpVarNamePrefix))
++  if (!VD->getName().starts_with(TmpVarNamePrefix))
+     return;
+   if (const Expr *E = VD->getInit())
+     ProcessedExprs[VD] = E->IgnoreParenImpCasts();
+@@ -374,9 +375,9 @@ bool ExpressionDetector::refToTmpVar(const NamedDecl *ND)
+   StringRef Name = ND->getName();
+   // We don't want to repeatly replace temporary variables
+   // __creduce_expr_tmp_xxx, __creduce_printed_yy and __creduce_checked_zzz.
+-  return Name.startswith(TmpVarNamePrefix) ||
+-         Name.startswith(PrintedVarNamePrefix) ||
+-         Name.startswith(CheckedVarNamePrefix);
++  return Name.starts_with(TmpVarNamePrefix) ||
++         Name.starts_with(PrintedVarNamePrefix) ||
++         Name.starts_with(CheckedVarNamePrefix);
+ }
+ 
+ // Reference: IdenticalExprChecker.cpp from Clang
+@@ -524,8 +525,8 @@ bool ExpressionDetector::isValidExpr(Stmt *S, const Expr *E)
+       if (const DeclRefExpr *SubE =
+           dyn_cast<DeclRefExpr>(UO->getSubExpr()->IgnoreParenCasts())) {
+         StringRef SubEName = SubE->getDecl()->getName();
+-        if (SubEName.startswith(PrintedVarNamePrefix) ||
+-            SubEName.startswith(CheckedVarNamePrefix))
++        if (SubEName.starts_with(PrintedVarNamePrefix) ||
++            SubEName.starts_with(CheckedVarNamePrefix))
+           return false;
+       }
+     }
+@@ -541,7 +542,7 @@ bool ExpressionDetector::isValidExpr(Stmt *S, const Expr *E)
+       bool IsLit = SC == Stmt::IntegerLiteralClass ||
+                    SC == Stmt::FloatingLiteralClass;
+       if (IsLit && DRE &&
+-          DRE->getDecl()->getName().startswith(TmpVarNamePrefix) &&
++          DRE->getDecl()->getName().starts_with(TmpVarNamePrefix) &&
+           S->getStmtClass() == Stmt::IfStmtClass) {
+         return false;
+       }
+diff --git a/clang_delta/RemoveNamespace.cpp b/clang_delta/RemoveNamespace.cpp
+index 400e934..3b02534 100644
+--- a/clang_delta/RemoveNamespace.cpp
++++ b/clang_delta/RemoveNamespace.cpp
+@@ -91,9 +91,6 @@ public:
+   bool VisitTemplateSpecializationTypeLoc(
+          TemplateSpecializationTypeLoc TSPLoc);
+ 
+-  bool VisitClassTemplatePartialSpecializationDecl(
+-         ClassTemplatePartialSpecializationDecl *D);
+-
+   bool VisitDependentTemplateSpecializationTypeLoc(
+          DependentTemplateSpecializationTypeLoc DTSLoc);
+ 
+@@ -419,38 +416,6 @@ bool RemoveNamespaceRewriteVisitor::VisitTemplateSpecializationTypeLoc(
+   return true;
+ }
+ 
+-bool RemoveNamespaceRewriteVisitor::VisitClassTemplatePartialSpecializationDecl(
+-       ClassTemplatePartialSpecializationDecl *D)
+-{
+-  const Type *Ty = D->getInjectedSpecializationType().getTypePtr();
+-  TransAssert(Ty && "Bad TypePtr!");
+-  const TemplateSpecializationType *TST =
+-    dyn_cast<TemplateSpecializationType>(Ty);
+-  TransAssert(TST && "Bad TemplateSpecializationType!");
+-
+-  TemplateName TplName = TST->getTemplateName();
+-  const TemplateDecl *TplD = TplName.getAsTemplateDecl();
+-  TransAssert(TplD && "Invalid TemplateDecl!");
+-  NamedDecl *ND = TplD->getTemplatedDecl();
+-  TransAssert(ND && "Invalid NamedDecl!");
+-
+-  const CXXRecordDecl *CXXRD = dyn_cast<CXXRecordDecl>(ND);
+-  TransAssert(CXXRD && "Invalid CXXRecordDecl!");
+-
+-  std::string Name;
+-  if (ConsumerInstance->getNewName(CXXRD, Name)) {
+-    const TypeSourceInfo *TyInfo = D->getTypeAsWritten();
+-    if (!TyInfo)
+-      return true;
+-    TypeLoc TyLoc = TyInfo->getTypeLoc();
+-    SourceLocation LocStart = TyLoc.getBeginLoc();
+-    TransAssert(LocStart.isValid() && "Invalid Location!");
+-    ConsumerInstance->TheRewriter.ReplaceText(
+-      LocStart, CXXRD->getNameAsString().size(), Name);
+-  }
+-  return true;
+-}
+-
+ // handle the case where a template specialization type cannot be resolved, e.g.
+ // template <class T> struct Base {};
+ // template <class T> struct Derived: public Base<T> {
+@@ -968,7 +933,7 @@ void RemoveNamespace::handleOneNamedDecl(const NamedDecl *ND,
+     TransAssert(IdInfo && "Invalid IdentifierInfo!");
+     NewName += IdInfo->getName();
+     // Make sure we have valid suffix for user literals
+-    if (IsUserLiteral && IdInfo->getName().startswith("_")) {
++    if (IsUserLiteral && IdInfo->getName().starts_with("_")) {
+       NewName = "_" + NewName;
+     }
+     NamedDeclToNewName[ND] = NewName;
+diff --git a/clang_delta/RenameCXXMethod.cpp b/clang_delta/RenameCXXMethod.cpp
+index e71cc73..21c6368 100644
+--- a/clang_delta/RenameCXXMethod.cpp
++++ b/clang_delta/RenameCXXMethod.cpp
+@@ -426,7 +426,7 @@ bool RenameCXXMethod::isValidName(const StringRef &Name)
+ {
+   size_t PrefixLen = MethodNamePrefix.length();
+   StringRef NamePrefix = Name.substr(0, PrefixLen);
+-  if (!NamePrefix.equals(MethodNamePrefix))
++  if (NamePrefix != MethodNamePrefix)
+     return false;
+   llvm::APInt Num;
+   return !Name.drop_front(PrefixLen).getAsInteger(10, Num);
