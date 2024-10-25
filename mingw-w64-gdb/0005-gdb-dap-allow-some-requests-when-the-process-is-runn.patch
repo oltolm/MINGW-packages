@@ -1,0 +1,39 @@
+From b219935d234756ddb69452c9bf95c3596123a33c Mon Sep 17 00:00:00 2001
+From: oltolm <oleg.tolmatcev@gmail.com>
+Date: Sun, 24 Nov 2024 18:39:13 +0100
+Subject: [PATCH] gdb/dap: allow some requests when the process is running
+
+---
+ gdb/python/lib/gdb/dap/breakpoint.py | 2 +-
+ gdb/python/lib/gdb/dap/locations.py  | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/gdb/python/lib/gdb/dap/breakpoint.py b/gdb/python/lib/gdb/dap/breakpoint.py
+index e60265b2f6..2936baa2f7 100644
+--- a/gdb/python/lib/gdb/dap/breakpoint.py
++++ b/gdb/python/lib/gdb/dap/breakpoint.py
+@@ -276,7 +276,7 @@ def _rewrite_src_breakpoint(
+     }
+ 
+ 
+-@request("setBreakpoints")
++@request("setBreakpoints", expect_stopped=False)
+ @capability("supportsHitConditionalBreakpoints")
+ @capability("supportsConditionalBreakpoints")
+ @capability("supportsLogPoints")
+diff --git a/gdb/python/lib/gdb/dap/locations.py b/gdb/python/lib/gdb/dap/locations.py
+index 92e68f5e23..4e3afc4da1 100644
+--- a/gdb/python/lib/gdb/dap/locations.py
++++ b/gdb/python/lib/gdb/dap/locations.py
+@@ -29,7 +29,7 @@ from .sources import decode_source
+ # This points out that fixing this would be an incompatibility but
+ # goes on to propose "if arguments property is missing, debug adapters
+ # should return an error".
+-@request("breakpointLocations")
++@request("breakpointLocations", expect_stopped=False)
+ @capability("supportsBreakpointLocationsRequest")
+ def breakpoint_locations(*, source, line: int, endLine: Optional[int] = None, **extra):
+     if endLine is None:
+-- 
+2.46.0.windows.1
+
