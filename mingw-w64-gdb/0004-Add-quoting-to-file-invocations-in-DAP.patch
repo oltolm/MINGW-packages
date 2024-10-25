@@ -1,0 +1,65 @@
+From c7e57281af00830d6d147ed8e4b87d17e6ad4b7b Mon Sep 17 00:00:00 2001
+From: Tom Tromey <tromey@adacore.com>
+Date: Wed, 11 Sep 2024 09:25:45 -0600
+Subject: [PATCH] Add quoting to 'file' invocations in DAP
+
+Oleg Tolmatcev noticed that DAP launch and attach requests don't
+properly handle Windows filenames, because "file" doesn't handle the
+backslash characters correctly.  This patch adds quoting to the
+command in an attempt to fix this.
+---
+ gdb/python/lib/gdb/dap/launch.py | 17 ++++++++++++++---
+ 1 file changed, 14 insertions(+), 3 deletions(-)
+
+diff --git a/gdb/python/lib/gdb/dap/launch.py b/gdb/python/lib/gdb/dap/launch.py
+index 2674e02eac..df1f667237 100644
+--- a/gdb/python/lib/gdb/dap/launch.py
++++ b/gdb/python/lib/gdb/dap/launch.py
+@@ -13,6 +13,8 @@
+ # You should have received a copy of the GNU General Public License
+ # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ 
++import re
++
+ # These are deprecated in 3.9, but required in older versions.
+ from typing import Mapping, Optional, Sequence
+ 
+@@ -20,7 +22,16 @@ import gdb
+ 
+ from .events import exec_and_expect_stop, expect_process, expect_stop
+ from .server import capability, request
+-from .startup import DAPException, exec_and_log
++from .startup import DAPException, exec_and_log, in_gdb_thread
++
++
++# A wrapper for the 'file' command that correctly quotes its argument.
++@in_gdb_thread
++def file_command(program):
++    # Handle whitespace, quotes, and backslashes here.  Exactly what
++    # to quote depends on libiberty's buildargv and safe-ctype.
++    program = re.sub("[ \t\n\r\f\v\\\\'\"]", "\\\\\\g<0>", program)
++    exec_and_log("file " + program)
+ 
+ 
+ # Any parameters here are necessarily extensions -- DAP requires this
+@@ -39,7 +50,7 @@ def launch(
+     if cwd is not None:
+         exec_and_log("cd " + cwd)
+     if program is not None:
+-        exec_and_log("file " + program)
++        file_command(program)
+     inf = gdb.selected_inferior()
+     if stopAtBeginningOfMainSubprogram:
+         main = inf.main_name
+@@ -63,7 +74,7 @@ def attach(
+     **args,
+ ):
+     if program is not None:
+-        exec_and_log("file " + program)
++        file_command(program)
+     if pid is not None:
+         cmd = "attach " + str(pid)
+     elif target is not None:
+-- 
+2.46.0.windows.1
+
