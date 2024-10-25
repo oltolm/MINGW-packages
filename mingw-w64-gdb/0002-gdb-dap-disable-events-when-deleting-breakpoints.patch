@@ -1,0 +1,33 @@
+From 59529d80e8f0c3a68c9285e82bdd1c97cc2760f3 Mon Sep 17 00:00:00 2001
+From: oltolm <oleg.tolmatcev@gmail.com>
+Date: Sat, 28 Sep 2024 11:35:04 +0200
+Subject: [PATCH] gdb-dap: disable events when deleting breakpoints
+
+when I disable a breakpoint in VS Code the breakpoint is removed
+instead. I compared the behavior to lldb-dap and disabled events when
+removing a breakpoint. Now it is possible to disable and enable
+breakpoints in VS Code.
+---
+ gdb/python/lib/gdb/dap/breakpoint.py | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/gdb/python/lib/gdb/dap/breakpoint.py b/gdb/python/lib/gdb/dap/breakpoint.py
+index db8ac10af6..15055f21b7 100644
+--- a/gdb/python/lib/gdb/dap/breakpoint.py
++++ b/gdb/python/lib/gdb/dap/breakpoint.py
+@@ -208,9 +208,9 @@ def _set_breakpoints_callback(kind, specs, creator):
+                     }
+                 )
+ 
+-    # Delete any breakpoints that were not reused.
+-    for entry in saved_map.values():
+-        entry.delete()
++        # Delete any breakpoints that were not reused.
++        for entry in saved_map.values():
++            entry.delete()
+     return result
+ 
+ 
+-- 
+2.46.0.windows.1
+
