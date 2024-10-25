@@ -59,6 +59,9 @@ apply_patch_with_msg() {
 
 prepare() {
   cd "${srcdir}"/${_realname}-${pkgver}
+  
+  rm gdb/doc/GDBvn.texi
+  rm gdb/doc/version.subst
 
   # https://sourceware.org/bugzilla/show_bug.cgi?id=15412
   apply_patch_with_msg \
@@ -74,7 +77,7 @@ prepare() {
   apply_patch_with_msg \
     0004-Python-Configure-path-fixes.patch \
     0005-W32-Always-check-USERPROFILE-if-HOME-is-not-set.patch
-
+    
   # hack! - libiberty configure tests for header files using "$CPP $CPPFLAGS"
   sed -i "/ac_cpp=/s/\$CPPFLAGS/\$CPPFLAGS -O2/" libiberty/configure
 }
@@ -128,7 +131,7 @@ package_gdb() {
   make DESTDIR="${pkgdir}" install
 
   # Remove unwanted files
-  rm -rf "${pkgdir}"${MINGW_PREFIX}/share/{man,info}
+  rm -f "${pkgdir}"${MINGW_PREFIX}/share/info/{bfd.info*,ctf-spec.info*,sframe-spec.info*}
 
   rm -f "${pkgdir}"${MINGW_PREFIX}/include/*.h
   rm -f "${pkgdir}"${MINGW_PREFIX}/lib/*.a
